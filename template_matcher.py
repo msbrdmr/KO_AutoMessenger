@@ -136,3 +136,5 @@ class TemplateMatcher:
 
 
 # TODO: Make it draw entire areas. For chatbox, make it sraw about 100 pixels more above for example
+# TODO: Get the user name as well and keep track of it.
+# TODO: Get the incoming users name from private chat box...
