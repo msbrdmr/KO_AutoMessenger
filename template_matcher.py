@@ -1,3 +1,4 @@
+import os
 import cv2
 import numpy as np
 import pygetwindow as gw
@@ -5,12 +6,12 @@ from PIL import ImageGrab
 
 
 class TemplateMatcher:
-    def __init__(self, window_title, chat_templates, private_chat_templates, private_chat_content_templates, threshold=0.5, overlap_threshold=0.5):
+    def __init__(self, window_title, chat_templates, private_chat_templates, private_chat_content_templates, offsets, threshold=0.5, overlap_threshold=0.5):
         self.window_title = window_title
         self.chat_templates = chat_templates
         self.private_chat_templates = private_chat_templates
         self.private_chat_content_templates = private_chat_content_templates
-
+        self.offsets = offsets
         self.threshold = threshold
         self.overlap_threshold = overlap_threshold
         self.window = self.get_window()
@@ -29,7 +30,7 @@ class TemplateMatcher:
     def capture_window_image(self):
         """Capture the game window."""
         left, top, right, bottom = self.window.left, self.window.top, self.window.right, self.window.bottom
-        screenshot = ImageGrab.grab(bbox=(left, top, right, bottom))
+        screenshot = ImageGrab.grab(bbox=(left+7, top+33, right-7, bottom-7))
         return cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
 
     def match_template_with_confidence(self, screen, templates):
@@ -84,15 +85,48 @@ class TemplateMatcher:
         indices = indices.flatten()
         return [boxes[i] for i in indices]
 
-    def draw_boxes_with_confidence(self, screen, boxes, label):
-        """Draw rectangles around detected areas with confidence scores."""
-        for (x, y, w, h, conf) in boxes:
+
+    def draw_boxes_with_confidence_and_save_images(self, screen, boxes, label, offset, output_dir="output_images"):
+        """Draw rectangles around detected areas with confidence scores and save the cropped images from these areas."""
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        
+        for i, (x, y, w, h, conf) in enumerate(boxes):
+            if offset[0] != 0:
+                y -= offset[0]
+                h += offset[0]
+            
+            if offset[1] != 0:
+                w += offset[1]
+
+            if offset[2] != 0:
+                h += offset[2]
+
+            if offset[3] != 0:
+                x -= offset[3]
+                w += offset[3]
+
+            # Ensure coordinates are non-negative
+            x = max(x, 0)
+            y = max(y, 0)
+
+            # Draw the rectangle on the screen
             cv2.rectangle(screen, (int(x), int(y)),
-                          (int(x + w), int(y + h)), (0, 255, 0), 2)
+                        (int(x + w), int(y + h)), (0, 255, 0), 2)
+
+            # Display the label with the confidence score
             text = f"{label}: {conf:.2f}"
             cv2.putText(screen, text, (int(x), int(y - 10)),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+
+            cropped_image = screen[int(y):int(y + h), int(x):int(x + w)]
+
+            # Save the cropped image with a unique filename
+            output_path = os.path.join(output_dir, f"{label}_{i}_{int(conf * 100)}.png")
+            cv2.imwrite(output_path, cropped_image)
+
         return screen
+
 
     def refresh_and_display(self):
         """Capture the screen, match templates, and display results."""
@@ -109,14 +143,81 @@ class TemplateMatcher:
         private_chat_content_boxes = self.non_max_suppression(
             private_chat_content_boxes)
 
-        screen_with_boxes = self.draw_boxes_with_confidence(
-            screen, chat_boxes, "Chat Box")
-        screen_with_boxes = self.draw_boxes_with_confidence(
-            screen_with_boxes, private_chat_boxes, "Private Chat Box")
-        screen_with_boxes = self.draw_boxes_with_confidence(
-            screen_with_boxes, private_chat_content_boxes, "Private Chat Content")
+        screen_with_boxes = self.draw_boxes_with_confidence_and_save_images(
+            screen, chat_boxes, "Chat Box", self.offsets["global_chat"])
+        screen_with_boxes = self.draw_boxes_with_confidence_and_save_images(
+            screen_with_boxes, private_chat_boxes, "Private Chat Box", self.offsets["private_chat"])
+        screen_with_boxes = self.draw_boxes_with_confidence_and_save_images(
+            screen_with_boxes, private_chat_content_boxes, "Private Chat Content", self.offsets["private_chat_content"])
 
         cv2.imshow("Detected Zones with Confidence", screen_with_boxes)
+
+
+    def get_cropped_images(self, screen, boxes, offset):
+        """Extract and return cropped images based on the bounding boxes, along with coordinates."""
+        cropped_images = []
+        for x, y, w, h, conf in boxes:
+            y = max(y - offset[0], 0)
+            h += offset[0]
+            w += offset[1]
+            h += offset[2]
+            x = max(x - offset[3], 0)
+            w += offset[3]
+
+            cropped_image = screen[int(y):int(y + h), int(x):int(x + w)]
+
+            cropped_images.append({
+                'coordinates': {'x': x, 'y': y, 'w': w, 'h': h},
+                'image': cropped_image
+            })
+
+        return cropped_images
+
+
+    def refresh_and_return_images(self):
+        """Capture screen, detect boxes, and return cropped images."""
+        screen = self.capture_window_image()
+
+        # Match templates and apply non-maximum suppression
+        chat_boxes = self.non_max_suppression(self.match_template_with_confidence(screen, self.chat_templates))
+        private_chat_boxes = self.non_max_suppression(self.match_template_with_confidence(screen, self.private_chat_templates))
+        private_chat_content_boxes = self.non_max_suppression(self.match_template_with_confidence(screen, self.private_chat_content_templates))
+
+        # Extract cropped images
+        chat_images = self.get_cropped_images(screen, chat_boxes, self.offsets["global_chat"])
+        private_chat_images = self.get_cropped_images(screen, private_chat_boxes, self.offsets["private_chat"])
+        private_chat_content_images = self.get_cropped_images(screen, private_chat_content_boxes, self.offsets["private_chat_content"])
+
+        # Return all images as a dictionary for structured access
+        return {
+            "chat_boxes": chat_images,
+            "private_chat_boxes": private_chat_images,
+            "private_chat_content_boxes": private_chat_content_images
+        }
+
+    def refresh_and_return_images(self):
+        screen = self.capture_window_image()
+        chat_boxes = self.match_template_with_confidence(
+            screen, self.chat_templates)
+        private_chat_boxes = self.match_template_with_confidence(
+            screen, self.private_chat_templates)
+        private_chat_content_boxes = self.match_template_with_confidence(
+            screen, self.private_chat_content_templates)
+
+        chat_boxes = self.non_max_suppression(chat_boxes)
+        private_chat_boxes = self.non_max_suppression(private_chat_boxes)
+        private_chat_content_boxes = self.non_max_suppression(
+            private_chat_content_boxes)
+
+        screen_with_boxes = self.draw_boxes_with_confidence_and_save_images(
+            screen, chat_boxes, "Chat Box", self.offsets["global_chat"])
+        screen_with_boxes = self.draw_boxes_with_confidence_and_save_images(
+            screen_with_boxes, private_chat_boxes, "Private Chat Box", self.offsets["private_chat"])
+        screen_with_boxes = self.draw_boxes_with_confidence_and_save_images(
+            screen_with_boxes, private_chat_content_boxes, "Private Chat Content", self.offsets["private_chat_content"])
+
+        return screen_with_boxes
+    
 
     def run(self):
         """Run the detection loop."""
