@@ -1,33 +1,54 @@
-# this file will handlw pyautogui commands
 import pyautogui
-import schedule
-import socket
 import time
-import heartbeat
-import pygetwindow
+import pygetwindow as gw
 import config
 
 
-# also, setup socket, on socket send pm or send gm triggers, one of the below func will work. Make the sleeps corect so that, the events are queued, and processed one by one. do not trigger events in parallel.
+class Controller:
+    def __init__(self, screen, matcher):
+        self.chat_open = False
+        self.screen = screen
+        self.matcher = matcher
 
+    def focus_window(self):
+        """Focuses the game window."""
+        try:
+            windows = gw.getWindowsWithTitle(self.matcher.window_title)
+            if not windows:
+                print(f"Error: Window titled '{self.matcher.window_title}' not found.")
+                return
 
-# 1- handle receiver, honor the hb data and show on ui, show active and offline ones, show messages, parse images, get the text, and put them on ui. 
-# 
-# 
-# 
-# Then setup sending mechanisms
-#   2- handle sender, send global messages, send private messages
+            window = windows[0]
+            window.activate()
+            time.sleep(0.5)
+            print(f"Focused on window: {self.matcher.window_title}")
 
+        except Exception as e:
+            print(f"Error focusing window: {e}")
 
+    def is_window_focused(self):
+        """Checks if the game window is currently focused."""
+        try:
+            active_window = gw.getActiveWindow()
+            if active_window and active_window.title == self.matcher.window_title:
+                return True
+            return False
+        except Exception as e:
+            print(f"Error checking focused window: {e}")
+            return False
 
-# socket setup
-socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-socket.connect(("127.0.0.1", 8000))
+    
 
+    def send_global_chat(self, message):
+        """Sends a message to the private chat if it's open."""
+        if not self.is_window_focused():
+            self.focus_window()
 
-
-def send_global_message(message, type):
-    pass
-
-def send_private_message(message, box_coords):
-    pass
+        try:
+            pyautogui.typewrite(message + '\n', interval=0.1)
+            time.sleep(0.5)
+            # enter to send 
+            pyautogui.press('enter')
+            print(f"Message sent: {message}")
+        except Exception as e:
+            print(f"Error sending message: {e}")

@@ -27,11 +27,21 @@ class TemplateMatcher:
             return windows[0]
         return None
 
+
     def capture_window_image(self):
         """Capture the game window."""
         left, top, right, bottom = self.window.left, self.window.top, self.window.right, self.window.bottom
-        screenshot = ImageGrab.grab(bbox=(left+7, top+33, right-7, bottom-7))
-        return cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
+        
+        if right <= left or bottom <= top:
+            print("Window is minimized or invalid. Skipping capture.")
+            return None
+        
+        try:
+            screenshot = ImageGrab.grab(bbox=(left+7, top+33, right-7, bottom-7))
+            return cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
+        except ValueError as e:
+            print(f"Error capturing the screen: {e}")
+            return None
 
     def match_template_with_confidence(self, screen, templates):
         """Match multiple templates within the screen and return bounding boxes with confidence."""
@@ -171,53 +181,7 @@ class TemplateMatcher:
                 'image': cropped_image
             })
 
-        return cropped_images
-
-
-    def refresh_and_return_images(self):
-        """Capture screen, detect boxes, and return cropped images."""
-        screen = self.capture_window_image()
-
-        # Match templates and apply non-maximum suppression
-        chat_boxes = self.non_max_suppression(self.match_template_with_confidence(screen, self.chat_templates))
-        private_chat_boxes = self.non_max_suppression(self.match_template_with_confidence(screen, self.private_chat_templates))
-        private_chat_content_boxes = self.non_max_suppression(self.match_template_with_confidence(screen, self.private_chat_content_templates))
-
-        # Extract cropped images
-        chat_images = self.get_cropped_images(screen, chat_boxes, self.offsets["global_chat"])
-        private_chat_images = self.get_cropped_images(screen, private_chat_boxes, self.offsets["private_chat"])
-        private_chat_content_images = self.get_cropped_images(screen, private_chat_content_boxes, self.offsets["private_chat_content"])
-
-        # Return all images as a dictionary for structured access
-        return {
-            "chat_boxes": chat_images,
-            "private_chat_boxes": private_chat_images,
-            "private_chat_content_boxes": private_chat_content_images
-        }
-
-    def refresh_and_return_images(self):
-        screen = self.capture_window_image()
-        chat_boxes = self.match_template_with_confidence(
-            screen, self.chat_templates)
-        private_chat_boxes = self.match_template_with_confidence(
-            screen, self.private_chat_templates)
-        private_chat_content_boxes = self.match_template_with_confidence(
-            screen, self.private_chat_content_templates)
-
-        chat_boxes = self.non_max_suppression(chat_boxes)
-        private_chat_boxes = self.non_max_suppression(private_chat_boxes)
-        private_chat_content_boxes = self.non_max_suppression(
-            private_chat_content_boxes)
-
-        screen_with_boxes = self.draw_boxes_with_confidence_and_save_images(
-            screen, chat_boxes, "Chat Box", self.offsets["global_chat"])
-        screen_with_boxes = self.draw_boxes_with_confidence_and_save_images(
-            screen_with_boxes, private_chat_boxes, "Private Chat Box", self.offsets["private_chat"])
-        screen_with_boxes = self.draw_boxes_with_confidence_and_save_images(
-            screen_with_boxes, private_chat_content_boxes, "Private Chat Content", self.offsets["private_chat_content"])
-
-        return screen_with_boxes
-    
+        return cropped_images if len(cropped_images) > 0 else []
 
     def run(self):
         """Run the detection loop."""
