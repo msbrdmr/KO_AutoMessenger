@@ -2,7 +2,7 @@ import time
 USERNAME = "Veratti"
 
 
-chat_templates = [
+global_chat_templates = [
     "templates/chat_0.png",
     "templates/chat_1.png",
     "templates/chat_2.png",
@@ -19,6 +19,14 @@ private_chat_content_templates = [
     "templates/private_chat_content.png",
 ]
 
+templates = {
+    "global_chat": global_chat_templates,
+    "private_chat": private_chat_templates,
+    "private_chat_content": private_chat_content_templates,
+}
+
+print('Setup complete with', templates)
+
 # top right bottom left
 offsets = {
     "global_chat": (165, -10, -53, -186),
@@ -28,7 +36,7 @@ offsets = {
 
 matcher_config = {
     "window_title": "Knight OnLine Client",
-    "chat_templates": chat_templates,
+    "global_chat_templates": global_chat_templates,
     "private_chat_templates": private_chat_templates,
     "private_chat_content_templates": private_chat_content_templates,
     "offsets": offsets,

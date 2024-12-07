@@ -6,9 +6,9 @@ from PIL import ImageGrab
 
 
 class TemplateMatcher:
-    def __init__(self, window_title, chat_templates, private_chat_templates, private_chat_content_templates, offsets, threshold=0.5, overlap_threshold=0.5):
+    def __init__(self, window_title, global_chat_templates, private_chat_templates, private_chat_content_templates, offsets, threshold=0.5, overlap_threshold=0.5):
         self.window_title = window_title
-        self.chat_templates = chat_templates
+        self.global_chat_templates = global_chat_templates
         self.private_chat_templates = private_chat_templates
         self.private_chat_content_templates = private_chat_content_templates
         self.offsets = offsets
@@ -142,7 +142,7 @@ class TemplateMatcher:
         """Capture the screen, match templates, and display results."""
         screen = self.capture_window_image()
         chat_boxes = self.match_template_with_confidence(
-            screen, self.chat_templates)
+            screen, self.global_chat_templates)
         private_chat_boxes = self.match_template_with_confidence(
             screen, self.private_chat_templates)
         private_chat_content_boxes = self.match_template_with_confidence(

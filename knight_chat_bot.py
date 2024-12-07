@@ -15,7 +15,7 @@ connected = False
 
 matcher = TemplateMatcher(
     window_title=config.matcher_config["window_title"],
-    chat_templates=config.matcher_config["chat_templates"],
+    global_chat_templates=config.matcher_config["global_chat_templates"],
     private_chat_templates=config.matcher_config["private_chat_templates"],
     private_chat_content_templates=config.matcher_config["private_chat_content_templates"],
     offsets=config.matcher_config["offsets"],
@@ -44,7 +44,7 @@ def on_message(ws, message):
                 print("Error: Failed to capture the screen.")
                 return
             chat_boxes = matcher.match_template_with_confidence(
-                screen, config.chat_templates)
+                screen, config.global_chat_templates)
             chat_boxes = matcher.non_max_suppression(chat_boxes)
             chat_data = matcher.get_cropped_images(
                 screen, chat_boxes, config.offsets["global_chat"])
@@ -65,13 +65,22 @@ def on_message(ws, message):
         elif action == "send_global_chat":
             msg = data.get("msg")
             print("Sending global chat data. Message:", msg)
-            # controller.send_global_chat(msg)
 
-            x = detect_template(config.chat_templates)
+            x = detect_template('global_chat')
 
-            print(x)
-            # first check if private chat is open
+            # print(keys(x[0]))
+            # to print keys of x[0] :
+            print(x[0]['coordinates'])
 
+            if x:
+                controller.send_global_chat(msg)
+
+        elif action == "send_private_chat":
+            msg = data.get("msg")
+            coords = data.get("coords")
+            print("Sending private message. Coords:", coords, "Message:", msg)
+            if coords:
+                controller.send_private_chat(coords, msg)
         else:
             print(f"Unknown action: {action}")
     except json.JSONDecodeError:
@@ -229,7 +238,7 @@ def fetch_images_periodically():
             return
 
         chat_boxes = matcher.match_template_with_confidence(
-            screen, config.chat_templates)
+            screen, config.global_chat_templates)
         private_chat_boxes = matcher.match_template_with_confidence(
             screen, config.private_chat_templates)
 
@@ -279,24 +288,29 @@ def send_private_chat_data_crops(ws, crops):
         print(f"Error sending private chat crops: {e}")
 
 
-def detect_template(template):
+def detect_template(template_name):
+    templates = config.templates[template_name]
+    print(f"Detecting templates for: {template_name}")
+
     try:
         screen = matcher.capture_window_image()
-
+        controller.focus_window()
         if screen is None:
             print("Error: Failed to capture the screen.")
+            return []
 
-        boxes = matcher.match_template_with_confidence(
-            screen, template)
+        boxes = matcher.match_template_with_confidence(screen, templates)
+        if boxes:
+            boxes = matcher.non_max_suppression(boxes)
+            cropped_images = matcher.get_cropped_images(
+                screen, boxes, config.offsets[template_name])
+            return cropped_images
 
-        boxes = matcher.non_max_suppression(boxes)
-        boxes = matcher.get_cropped_images(
-            screen, boxes, config.offsets[template])
-
-        return boxes
+        return []
 
     except Exception as e:
         print(f"Error capturing the screen: {e}")
+        return []
 
 
 def reconnect_websocket():
