@@ -85,40 +85,40 @@ class Controller:
         except Exception as e:
             print(f"Error sending message: {e}")
 
-def send_private_chat(self, coords, message):
-    if not self.is_window_focused():
-        if not self.focus_window():
-            print("Unable to focus the game window. Cannot send message.")
-            return
+    def send_private_chat(self, coords, message):
+        if not self.is_window_focused():
+            if not self.focus_window():
+                print("Unable to focus the game window. Cannot send message.")
+                return
 
-    try:
-        x, y, w, h = coords
+        try:
+            x, y, w, h = coords
 
-        middle_y = y + h // 2
-        middle_x = x + w - 10
+            middle_y = y + h // 2
+            middle_x = x + w - 10
 
-        autoit.mouse_click("left", middle_x, middle_y)
-        time.sleep(0.5)
-        print(f"Opened private chat box.")
-        pyperclip.copy(message)
-        pydirectinput.press('enter')
-        time.sleep(0.5)
-        pydirectinput.press('backspace')
-        time.sleep(0.5)
-        
-        apply_hotkeys('ctrl', 'v')
-        print(f"Pasted message: {message}")
-        time.sleep(0.5)
-        
-        pydirectinput.press('enter')
-        time.sleep(0.5)
-        
-        print(f"Message sent: {message}")
-        # press esc to close the box.
-        pydirectinput.press('esc') 
+            autoit.mouse_click("left", middle_x, middle_y)
+            time.sleep(0.5)
+            print(f"Opened private chat box.")
+            pyperclip.copy(message)
+            pydirectinput.press('enter')
+            time.sleep(0.5)
+            pydirectinput.press('backspace')
+            time.sleep(0.5)
+            
+            apply_hotkeys('ctrl', 'v')
+            print(f"Pasted message: {message}")
+            time.sleep(0.5)
+            
+            pydirectinput.press('enter')
+            time.sleep(0.5)
+            
+            print(f"Message sent: {message}")
+            # press esc to close the box.
+            pydirectinput.press('esc') 
 
-    except Exception as e:
-        print(f"Error sending private message: {e}")
+        except Exception as e:
+            print(f"Error sending private message: {e}")
 
 def apply_hotkeys(key1, key2):
     pydirectinput.keyDown(key1)
