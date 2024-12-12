@@ -1,11 +1,13 @@
+import autoit
 import time
 import pyperclip
 import pydirectinput
-import autoit
 import pyautogui
 import pygetwindow as gw
 import cv2
 import numpy as np
+import os
+os.environ['AUTOIT_DLL_PATH'] = "C:\\Program Files(x86)\\AutoIt3\\AutoItX\\AutoItX3.dll"
 
 pydirectinput.PAUSE = 0.1
 pydirectinput.HOTKEYS = True
@@ -45,7 +47,6 @@ class Controller:
         except Exception as e:
             print(f"Error focusing window: {e}")
             return False
-
 
     def reset_view(self, screen):
         self.screen = screen

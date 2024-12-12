@@ -9,3 +9,19 @@ pycache/
 log/
 __pycache__/
 pycache/
+
+# Ignore virtual environment folder
+/venv/
+
+# Ignore log files
+log/
+
+# Ignore dist files
+dist/
+
+# Ignore build files
+build/
+
+chromedriver.exe
+
+

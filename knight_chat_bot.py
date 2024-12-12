@@ -7,15 +7,28 @@ import cv2
 import config
 from template_matcher import TemplateMatcher
 from controller import Controller
+import requests
+import subprocess
+import sys
+import os
+from pystray import Icon, MenuItem, Menu
+import sys
+from PIL import Image, ImageDraw
+
+
+REPO_OWNER = 'msbrdmr'
+REPO_NAME = 'KO_AutoMessenger'
+CURRENT_VERSION = '1.0.0'
+
 
 SERVER_URL = "ws://localhost:8000"
-ws = None  # WebSocket object
-ws_thread = None  # WebSocket thread object
-connected = False  # To track WebSocket connection status
-PM_ACTIVE = False  # To track private messaging status
-AUTO_CHAT_ACTIVE = False  # To track auto-chat status
-AUTO_CHAT_THREAD = None  # To hold the auto-chat thread
-STOP_EVENT = threading.Event()  # Stop event for the auto-chat thread
+ws = None
+ws_thread = None
+connected = False
+PM_ACTIVE = False
+AUTO_CHAT_ACTIVE = False
+AUTO_CHAT_THREAD = None
+STOP_EVENT = threading.Event()
 
 
 matcher = TemplateMatcher(
@@ -83,7 +96,7 @@ def on_message(ws, message):
                 PM_ACTIVE = False
 
         elif action == "stop_private_chat":
-            # action: 'stop_private_chat', username, socketId
+
             if screen is None:
                 print("Error: Failed to capture the screen.")
                 return
@@ -106,18 +119,11 @@ def on_message(ws, message):
             pcc = matcher.detect_template('private_chat_content')
             if PM_ACTIVE and len(pcc) == 1 and msg:
                 controller.send_private_chat_2(msg, pcc[0]['coordinates'])
-            # TODO: Fix coordinates false detection
 
         elif action == "start_auto_chat":
             messages = data.get("messages")
             duration = data.get("duration")
             interval = data.get("interval")
-
-            #   action: 'start_auto_chat',
-            #   username,
-            #   messages,
-            #   interval,
-            #   duration,
 
             print("Starting auto chat with data:",
                   messages, interval, duration)
@@ -423,9 +429,62 @@ def check_and_send_heartbeat():
         reconnect_websocket()
 
 
-if __name__ == "__main__":
-    reconnect_websocket()
+def create_image():
+    image = Image.new('RGB', (64, 64), color=(255, 255, 255))
+    draw = ImageDraw.Draw(image)
+    draw.text((10, 10), "App", fill=(0, 0, 0))
+    return image
 
-    while True:
-        check_and_send_heartbeat()
-        time.sleep(3)
+
+def quit_action(icon):
+    icon.stop()
+
+
+def run_in_background():
+    icon = Icon("test", create_image(), menu=Menu(
+        MenuItem("Quit", quit_action)))
+    icon.run()
+
+
+def check_for_updates():
+    try:
+        url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/releases/latest"
+        response = requests.get(url)
+        response.raise_for_status()
+        latest_version = response.json()["tag_name"]
+
+        if latest_version != CURRENT_VERSION:
+            print(
+                f"New version available: {latest_version}. Downloading update...")
+            download_update(latest_version, "YourAppName")
+        else:
+            print("You are using the latest version.")
+    except requests.exceptions.RequestException as e:
+        print(f"Error checking for updates: {e}")
+
+
+def download_update(version, app_name):
+    try:
+        download_url = f"https://github.com/{REPO_OWNER}/{REPO_NAME}/releases/download/{version}/{app_name}.exe"
+        response = requests.get(download_url)
+        response.raise_for_status()
+
+        with open('installer.exe', 'wb') as f:
+            f.write(response.content)
+        print("Update downloaded. Installing...")
+        subprocess.run(['installer.exe', '/silent'])
+        sys.exit()
+    except requests.exceptions.RequestException as e:
+        print(f"Error downloading update: {e}")
+    except subprocess.CalledProcessError as e:
+        print(f"Error running the installer: {e}")
+
+
+if __name__ == "__main__":
+    try:
+        reconnect_websocket()
+        while True:
+            check_and_send_heartbeat()
+            time.sleep(3)
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
