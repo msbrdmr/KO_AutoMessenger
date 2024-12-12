@@ -3,17 +3,23 @@ import cv2
 import numpy as np
 import pygetwindow as gw
 from PIL import ImageGrab
+import config
+from controller import Controller
 
 
 class TemplateMatcher:
-    def __init__(self, window_title, global_chat_templates, private_chat_templates, private_chat_content_templates, offsets, threshold=0.5, overlap_threshold=0.5):
+    def __init__(self, window_title, global_chat_templates, private_chat_templates, private_chat_content_templates, global_chat_active_templates, offsets, threshold=0.5, overlap_threshold=0.5):
+        self.controller = None
         self.window_title = window_title
         self.global_chat_templates = global_chat_templates
         self.private_chat_templates = private_chat_templates
         self.private_chat_content_templates = private_chat_content_templates
+        self.global_chat_active_templates = global_chat_active_templates
         self.offsets = offsets
         self.threshold = threshold
         self.overlap_threshold = overlap_threshold
+        self.window_position = None
+        self.top_center = None
         self.window = self.get_window()
         if not self.window:
             raise RuntimeError(f"Window '{self.window_title}' not found!")
@@ -27,17 +33,25 @@ class TemplateMatcher:
             return windows[0]
         return None
 
-
     def capture_window_image(self):
         """Capture the game window."""
         left, top, right, bottom = self.window.left, self.window.top, self.window.right, self.window.bottom
-        
+
         if right <= left or bottom <= top:
             print("Window is minimized or invalid. Skipping capture.")
             return None
         
+        top += config.grab_screen_offset['top']
+        left += config.grab_screen_offset['left']
+        right += config.grab_screen_offset['right']
+        bottom += config.grab_screen_offset['bottom']
+
+        self.window_position = {"top": top, "left": left}
+        self.top_center = {"top": top , "left": left + (right - left) // 2}
+        # print(f"Window position: {self.window_position}")
         try:
-            screenshot = ImageGrab.grab(bbox=(left+7, top+33, right-7, bottom-7))
+            screenshot = ImageGrab.grab(
+                bbox=(left, top, right, bottom))
             return cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
         except ValueError as e:
             print(f"Error capturing the screen: {e}")
@@ -69,6 +83,61 @@ class TemplateMatcher:
 
         return all_boxes
 
+    def detect_template(self, template_name, verbose=False, focus=False):
+        templates = config.templates.get(template_name, None)
+        if not templates:
+            print(f"Error: No templates found for {template_name}.")
+            return []
+
+        if verbose:
+            print(f"Detecting templates for: {template_name}")
+
+        try:
+            screen = None
+            try:
+                screen = self.capture_window_image()
+            except Exception as e:
+                print(f"Error capturing screen image: {e}")
+            
+            if screen is None:
+                print("Error: Failed to capture the screen.")
+                return []
+            
+            if focus:
+                try:
+                    self.controller.focus_window()
+                except Exception as e:
+                    print(f"Error focusing window: {e}")
+                    return []
+
+            try:
+                boxes = self.match_template_with_confidence(screen, templates)
+            except Exception as e:
+                print(f"Error during template matching: {e}")
+                return []
+            
+            if not boxes:
+                return []
+
+            try:
+                boxes = self.non_max_suppression(boxes)
+            except Exception as e:
+                print(f"Error during non-max suppression: {e}")
+                return []
+
+            try:
+                cropped_images = self.get_cropped_images(screen, boxes, config.offsets.get(template_name, {}))
+            except Exception as e:
+                print(f"Error cropping images: {e}")
+                return []
+
+            return cropped_images
+
+        except Exception as e:
+            print(f"Unexpected error during template detection: {e}")
+            return []
+
+
     def non_max_suppression(self, boxes):
         """Filter overlapping boxes using non-maximum suppression."""
         if not boxes:
@@ -95,17 +164,16 @@ class TemplateMatcher:
         indices = indices.flatten()
         return [boxes[i] for i in indices]
 
-
     def draw_boxes_with_confidence_and_save_images(self, screen, boxes, label, offset, output_dir="output_images"):
         """Draw rectangles around detected areas with confidence scores and save the cropped images from these areas."""
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
-        
+
         for i, (x, y, w, h, conf) in enumerate(boxes):
             if offset[0] != 0:
                 y -= offset[0]
                 h += offset[0]
-            
+
             if offset[1] != 0:
                 w += offset[1]
 
@@ -122,7 +190,7 @@ class TemplateMatcher:
 
             # Draw the rectangle on the screen
             cv2.rectangle(screen, (int(x), int(y)),
-                        (int(x + w), int(y + h)), (0, 255, 0), 2)
+                          (int(x + w), int(y + h)), (0, 255, 0), 2)
 
             # Display the label with the confidence score
             text = f"{label}: {conf:.2f}"
@@ -132,11 +200,11 @@ class TemplateMatcher:
             cropped_image = screen[int(y):int(y + h), int(x):int(x + w)]
 
             # Save the cropped image with a unique filename
-            output_path = os.path.join(output_dir, f"{label}_{i}_{int(conf * 100)}.png")
+            output_path = os.path.join(
+                output_dir, f"{label}_{i}_{int(conf * 100)}.png")
             cv2.imwrite(output_path, cropped_image)
 
         return screen
-
 
     def refresh_and_display(self):
         """Capture the screen, match templates, and display results."""
@@ -162,7 +230,6 @@ class TemplateMatcher:
 
         cv2.imshow("Detected Zones with Confidence", screen_with_boxes)
 
-
     def get_cropped_images(self, screen, boxes, offset):
         """Extract and return cropped images based on the bounding boxes, along with coordinates."""
         cropped_images = []
@@ -182,6 +249,10 @@ class TemplateMatcher:
             })
 
         return cropped_images if len(cropped_images) > 0 else []
+
+    def is_global_chat_active(self, screen):
+        """Check if the global chat is active."""
+        # firtst check if theres global chat. Then check if its active.
 
     def run(self):
         """Run the detection loop."""

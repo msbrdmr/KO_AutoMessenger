@@ -16,13 +16,18 @@ private_chat_templates = [
 ]
 
 private_chat_content_templates = [
-    "templates/private_chat_content.png",
+    "templates/private_chat_content.png"
+]
+
+global_chat_active_templates = [
+    "templates/global_chat_active.png"
 ]
 
 templates = {
     "global_chat": global_chat_templates,
     "private_chat": private_chat_templates,
     "private_chat_content": private_chat_content_templates,
+    "global_chat_active": global_chat_active_templates
 }
 
 print('Setup complete with', templates)
@@ -31,7 +36,8 @@ print('Setup complete with', templates)
 offsets = {
     "global_chat": (165, -10, -53, -186),
     "private_chat": (0, 0, 0, 175),
-    "private_chat_content": (-30, 0, 0, 365),
+    "private_chat_content": (-11, -23, -53, 365),
+    "global_chat_active": (0, 0, 0, 0)
 }
 
 matcher_config = {
@@ -39,9 +45,17 @@ matcher_config = {
     "global_chat_templates": global_chat_templates,
     "private_chat_templates": private_chat_templates,
     "private_chat_content_templates": private_chat_content_templates,
+    "global_chat_active_templates": global_chat_active_templates,
     "offsets": offsets,
     "threshold": 0.6,
     "overlap_threshold": 0.4
+}
+
+grab_screen_offset = {
+    "top": 33,
+    "left": 8,
+    "right": -8,
+    "bottom": -8
 }
 
 FETCH_INTERVAL = 5
