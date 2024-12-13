@@ -48,7 +48,12 @@ EXE_NAME = "knight_chat_bot.exe"
 EXTRACT_DIR = os.path.join(os.getcwd(), "dist")
 
 
-SERVER_URL = "ws://localhost:8000"
+# SERVER_URL = "ws://localhost:8000"
+# get it from a text file.
+config_file = os.path.join(os.getcwd(), "config.txt")
+IP = config.IP
+SERVER_URL = f"ws://{IP}:8000"
+
 ws = None
 ws_thread = None
 connected = False
@@ -469,23 +474,32 @@ def download_update(url, save_path):
             return False
 
 
+def create_update_script(zip_path, target_dir, exe_name):
+    script_path = os.path.join(DOWNLOAD_DIR, "update_script.bat")
+    extracted_dir = os.path.join(DOWNLOAD_DIR, "extracted")
+
+    with open(script_path, "w") as script:
+        script.write(f"""@echo off
+        timeout /t 2 /nobreak >nul
+        echo Extracting update...
+        powershell -Command "Expand-Archive -Force '{zip_path}' '{extracted_dir}'"
+        echo Installing update...
+        xcopy "{extracted_dir}\\*" "{target_dir}" /s /e /y
+        del "{zip_path}" >nul 2>&1
+        rmdir /s /q "{extracted_dir}"
+        echo Update installed successfully.
+        echo Restarting application...
+        cd /d "{target_dir}"
+        start "" "{os.path.join(target_dir, exe_name)}"
+        exit
+        """)
+    return script_path
 
 
-def unpack_and_overwrite(zip_path, target_dir):
-    print("Installing the update...")
-    with zipfile.ZipFile(zip_path, "r") as zip_ref:
-        for file in zip_ref.namelist():
-            target_file = os.path.join(target_dir, file)
-            if os.path.exists(target_file):
-                os.remove(target_file)
-            zip_ref.extract(file, target_dir)
-    print("Update installed successfully.")
-
-
-
-def relaunch_updated_exe(exe_path):
-    print(f"Launching the updated executable: {exe_path}")
-    subprocess.Popen([exe_path], shell=True)
+def trigger_update(zip_path, exe_name):
+    print("Preparing to update...")
+    script_path = create_update_script(zip_path, CURRENT_DIR, exe_name)
+    subprocess.Popen(["cmd.exe", "/c", script_path], shell=True)
     sys.exit(0)
 
 
@@ -493,27 +507,13 @@ def check_for_update():
     os.makedirs(DOWNLOAD_DIR, exist_ok=True)
     zip_path = os.path.join(DOWNLOAD_DIR, "dist.zip")
 
-    
     if download_update(DOWNLOAD_URL, zip_path):
-        
-        unpack_and_overwrite(zip_path, CURRENT_DIR)
-
-        
-        os.remove(zip_path)
-        shutil.rmtree(DOWNLOAD_DIR)
-
-        
-        exe_path = os.path.join(CURRENT_DIR, EXE_NAME)
-        if os.path.exists(exe_path):
-            relaunch_updated_exe(exe_path)
-        else:
-            print(f"Error: {exe_path} not found after update.")
-            sys.exit(1)
+        trigger_update(zip_path, EXE_NAME)
 
 
 if __name__ == "__main__":
     try:
-        check_for_update()
+        # check_for_update()
         reconnect_websocket()
         while True:
             check_and_send_heartbeat()

@@ -1,6 +1,18 @@
 import time
-USERNAME = "Veratti"
+import os
+# USERNAME = "Veratti"
 
+def get(key):
+    with open("config.txt", "r") as f:
+        for line in f:
+            if key in line:
+                return line.split(":")[1].strip()
+    return None
+
+
+USERNAME = get("user")
+SERVER = get("server")
+IP = get("ip")
 
 global_chat_templates = [
     "templates/chat_0.png",
