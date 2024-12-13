@@ -1,7 +1,9 @@
 import threading
 import time
 import websocket
+import shutil
 import json
+import zipfile
 import base64
 import cv2
 import config
@@ -11,9 +13,7 @@ import requests
 import subprocess
 import sys
 import os
-from pystray import Icon, MenuItem, Menu
 import sys
-from PIL import Image, ImageDraw
 
 if getattr(sys, 'frozen', False):
     app_path = os.path.dirname(sys.executable)
@@ -37,6 +37,15 @@ else:
 REPO_OWNER = 'msbrdmr'
 REPO_NAME = 'KO_AutoMessenger'
 CURRENT_VERSION = '1.0.0'
+
+CURRENT_DIR = os.getcwd()
+
+GITHUB_USERNAME = "msbrdmr"
+REPO_NAME = "KO_AutoMessenger"
+DOWNLOAD_URL = f"https://github.com/{GITHUB_USERNAME}/{REPO_NAME}/releases/latest/download/dist.zip"
+DOWNLOAD_DIR = os.path.join(os.getcwd(), "update_temp")
+EXE_NAME = "knight_chat_bot.exe"
+EXTRACT_DIR = os.path.join(os.getcwd(), "dist")
 
 
 SERVER_URL = "ws://localhost:8000"
@@ -447,59 +456,64 @@ def check_and_send_heartbeat():
         reconnect_websocket()
 
 
-def create_image():
-    image = Image.new('RGB', (64, 64), color=(255, 255, 255))
-    draw = ImageDraw.Draw(image)
-    draw.text((10, 10), "App", fill=(0, 0, 0))
-    return image
-
-
-def quit_action(icon):
-    icon.stop()
-
-
-def run_in_background():
-    icon = Icon("test", create_image(), menu=Menu(
-        MenuItem("Quit", quit_action)))
-    icon.run()
-
-
-def check_for_updates():
-    try:
-        url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/releases/latest"
-        response = requests.get(url)
-        response.raise_for_status()
-        latest_version = response.json()["tag_name"]
-
-        if latest_version != CURRENT_VERSION:
-            print(
-                f"New version available: {latest_version}. Downloading update...")
-            download_update(latest_version, "YourAppName")
+def download_update(url, save_path):
+    print(f"Checking for updates from {url}...")
+    with requests.get(url, stream=True) as response:
+        if response.status_code == 200:
+            with open(save_path, "wb") as file:
+                shutil.copyfileobj(response.raw, file)
+            print("Update downloaded successfully.")
+            return True
         else:
-            print("You are using the latest version.")
-    except requests.exceptions.RequestException as e:
-        print(f"Error checking for updates: {e}")
+            print(f"No update available. Status code: {response.status_code}")
+            return False
 
 
-def download_update(version, app_name):
-    try:
-        download_url = f"https://github.com/{REPO_OWNER}/{REPO_NAME}/releases/download/{version}/{app_name}.exe"
-        response = requests.get(download_url)
-        response.raise_for_status()
 
-        with open('installer.exe', 'wb') as f:
-            f.write(response.content)
-        print("Update downloaded. Installing...")
-        subprocess.run(['installer.exe', '/silent'])
-        sys.exit()
-    except requests.exceptions.RequestException as e:
-        print(f"Error downloading update: {e}")
-    except subprocess.CalledProcessError as e:
-        print(f"Error running the installer: {e}")
+
+def unpack_and_overwrite(zip_path, target_dir):
+    print("Installing the update...")
+    with zipfile.ZipFile(zip_path, "r") as zip_ref:
+        for file in zip_ref.namelist():
+            target_file = os.path.join(target_dir, file)
+            if os.path.exists(target_file):
+                os.remove(target_file)
+            zip_ref.extract(file, target_dir)
+    print("Update installed successfully.")
+
+
+
+def relaunch_updated_exe(exe_path):
+    print(f"Launching the updated executable: {exe_path}")
+    subprocess.Popen([exe_path], shell=True)
+    sys.exit(0)
+
+
+def check_for_update():
+    os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+    zip_path = os.path.join(DOWNLOAD_DIR, "dist.zip")
+
+    
+    if download_update(DOWNLOAD_URL, zip_path):
+        
+        unpack_and_overwrite(zip_path, CURRENT_DIR)
+
+        
+        os.remove(zip_path)
+        shutil.rmtree(DOWNLOAD_DIR)
+
+        
+        exe_path = os.path.join(CURRENT_DIR, EXE_NAME)
+        if os.path.exists(exe_path):
+            relaunch_updated_exe(exe_path)
+        else:
+            print(f"Error: {exe_path} not found after update.")
+            sys.exit(1)
 
 
 if __name__ == "__main__":
     try:
+        check_for_update()
         reconnect_websocket()
         while True:
             check_and_send_heartbeat()
