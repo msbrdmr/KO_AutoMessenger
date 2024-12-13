@@ -15,6 +15,24 @@ from pystray import Icon, MenuItem, Menu
 import sys
 from PIL import Image, ImageDraw
 
+if getattr(sys, 'frozen', False):
+    app_path = os.path.dirname(sys.executable)
+else:
+    app_path = os.path.dirname(os.path.abspath(__file__))
+
+app_path = os.path.abspath(os.path.join(app_path, '..'))
+
+autoit_dll_path = os.path.join(app_path, 'autoit', 'lib', 'AutoItX3_x64.dll')
+
+if os.path.exists(autoit_dll_path):
+    os.environ['AUTOIT_X64_DLL'] = autoit_dll_path
+else:
+    print(f"Error: {autoit_dll_path} not found.")
+if os.path.exists(autoit_dll_path):
+    os.environ['AUTOIT_X64_DLL'] = autoit_dll_path
+else:
+    print(f"Error: {autoit_dll_path} not found.")
+
 
 REPO_OWNER = 'msbrdmr'
 REPO_NAME = 'KO_AutoMessenger'
