@@ -2,11 +2,13 @@ import time
 import os
 # USERNAME = "Veratti"
 
+
 def get(key):
     with open("config.txt", "r") as f:
         for line in f:
-            if key in line:
-                return line.split(":")[1].strip()
+            if line.startswith(f"{key}:"):
+                key_part, value_part = line.split(":", 1)
+                return value_part.strip()
     return None
 
 

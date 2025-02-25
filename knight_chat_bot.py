@@ -48,11 +48,9 @@ EXE_NAME = "knight_chat_bot.exe"
 EXTRACT_DIR = os.path.join(os.getcwd(), "dist")
 
 
-# SERVER_URL = "ws://localhost:8000"
-# get it from a text file.
 config_file = os.path.join(os.getcwd(), "config.txt")
 IP = config.IP
-SERVER_URL = f"ws://{IP}:8000"
+SERVER_URL = IP
 
 ws = None
 ws_thread = None
@@ -454,10 +452,11 @@ def reconnect_websocket():
 
 
 def check_and_send_heartbeat():
+    global SERVER_URL
     if connected:
         fetch_images_periodically()
     else:
-        print("WebSocket is not connected. Trying to reconnect...")
+        print("WebSocket is not connected. Trying to reconnect to url ", SERVER_URL)
         reconnect_websocket()
 
 
